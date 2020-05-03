@@ -1,12 +1,24 @@
 
 package com.b8ne.RNPusherPushNotifications;
 
+import android.content.Intent;
 import android.os.AsyncTask;
+
+import com.facebook.react.bridge.Promise;
 import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.bridge.ReactContextBaseJavaModule;
 import com.facebook.react.bridge.ReactMethod;
 import com.facebook.react.bridge.LifecycleEventListener;
 import com.facebook.react.bridge.Callback;
+import android.os.Bundle;
+import org.json.JSONException;
+import org.json.JSONObject;
+import com.facebook.react.bridge.Arguments;
+import com.facebook.react.bridge.WritableMap;
+import android.os.Build;
+import android.app.Activity;
+
+import java.util.Set;
 
 // SEE: https://docs.pusher.com/beams/reference/android
 
@@ -119,4 +131,54 @@ public class RNPusherPushNotificationsModule extends ReactContextBaseJavaModule 
         });
     }
 
+    private Bundle getBundleFromIntent(Intent intent) {
+        Bundle bundle = null;
+        if (intent.hasExtra("notification")) {
+            bundle = intent.getBundleExtra("notification");
+        } else if (intent.hasExtra("google.message_id")) {
+            bundle = intent.getExtras();
+        }
+        return bundle;
+    }
+
+    private String convertJSON(Bundle bundle) {
+        try {
+            JSONObject json = this.convertJSONObject(bundle);
+            return json.toString();
+        } catch (JSONException e) {
+            return null;
+        }
+    }
+
+    // a Bundle is not a map, so we have to convert it explicitly
+    private JSONObject convertJSONObject(Bundle bundle) throws JSONException {
+        JSONObject json = new JSONObject();
+        Set<String> keys = bundle.keySet();
+        for (String key : keys) {
+            Object value = bundle.get(key);
+            if (value instanceof Bundle) {
+                json.put(key, convertJSONObject((Bundle)value));
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+                json.put(key, JSONObject.wrap(value));
+            } else {
+                json.put(key, value);
+            }
+        }
+        return json;
+    }
+
+    @ReactMethod
+    public void getInitialNotification(Promise promise) {
+        WritableMap params = Arguments.createMap();
+        Activity activity = getCurrentActivity();
+        if (activity != null) {
+            Bundle bundle = this.getBundleFromIntent(activity.getIntent());
+            if (bundle != null) {
+                bundle.putBoolean("foreground", false);
+                String bundleString = this.convertJSON(bundle);
+                params.putString("dataJSON", bundleString);
+            }
+        }
+        promise.resolve(params);
+    }
 }

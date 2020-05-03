@@ -74,4 +74,10 @@ export default {
       DeviceEventEmitter.addListener(eventName, payload => callback(payload));
     }
   },
+  getInitialNotification: () => {
+    if (Platform.OS === 'android') {
+      return RNPusherPushNotifications.getInitialNotification();
+    }
+    return null;
+  },
 };
